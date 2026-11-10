@@ -1,0 +1,54 @@
+name: Build Android APK
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'scenerymaker.zip'
+      - '.github/workflows/build.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Unpack project ZIP
+        run: |
+          mkdir -p project
+          unzip -q scenerymaker.zip -d project
+          test -f project/settings.gradle.kts
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+
+      - name: Build APK
+        working-directory: project
+        run: gradle --no-daemon assembleDebug
+
+      - name: Package APK into one ZIP
+        run: |
+          mkdir -p distribution
+          cp project/app/build/outputs/apk/debug/app-debug.apk distribution/SceneryMaker-HD.apk
+          cd distribution
+          zip -9 SceneryMaker-HD-APK.zip SceneryMaker-HD.apk
+          test "$(stat -c%s SceneryMaker-HD.apk)" -le 209715200
+
+      - name: Upload APK ZIP artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: SceneryMaker-HD-APK
+          path: distribution/SceneryMaker-HD-APK.zip
+          retention-days: 30
