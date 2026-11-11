@@ -13,30 +13,49 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+
       - name: Unpack iOS project
         run: |
           rm -rf ios
           mkdir -p ios
           unzip -q ios.zip -d ios
+
       - name: Install XcodeGen
         run: brew install xcodegen
+
       - name: Generate Xcode project
         working-directory: ios
         run: xcodegen generate
+
       - name: Build unsigned iOS app
         working-directory: ios
         run: |
-          xcodebuild -project AerialSceneryMaker.xcodeproj \
-            -scheme AerialSceneryMaker -sdk iphoneos \
-            -configuration Release CODE_SIGNING_ALLOWED=NO \
+          xcodebuild \
+            -project AerialSceneryMaker.xcodeproj \
+            -scheme AerialSceneryMaker \
+            -sdk iphoneos \
+            -configuration Release \
+            CODE_SIGNING_ALLOWED=NO \
             -derivedDataPath build
+
       - name: Package unsigned IPA
+        shell: bash
         run: |
-          APP_PATH="ios/build/Build/Products/Release-iphoneos/AerialSceneryMaker.app"
+          APP_DIR="ios/build/Build/Products/Release-iphoneos"
+          APP_PATH="$(find "$APP_DIR" -maxdepth 1 -type d -name '*.app' -print -quit)"
+
+          if [ -z "$APP_PATH" ]; then
+            echo "Error: no .app bundle found in $APP_DIR"
+            find "$APP_DIR" -maxdepth 2 -print || true
+            exit 1
+          fi
+
+          echo "Packaging app: $APP_PATH"
           mkdir -p Payload
           cp -R "$APP_PATH" Payload/
           zip -qr AerialSceneryMaker-unsigned.ipa Payload
           rm -rf Payload
+
       - name: Upload unsigned IPA
         uses: actions/upload-artifact@v4
         with:
