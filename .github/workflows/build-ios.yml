@@ -1,0 +1,44 @@
+name: Build iOS app
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'ios.zip'
+      - '.github/workflows/build-ios.yml'
+
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Unpack iOS project
+        run: |
+          rm -rf ios
+          mkdir -p ios
+          unzip -q ios.zip -d ios
+      - name: Install XcodeGen
+        run: brew install xcodegen
+      - name: Generate Xcode project
+        working-directory: ios
+        run: xcodegen generate
+      - name: Build unsigned iOS app
+        working-directory: ios
+        run: |
+          xcodebuild -project AerialSceneryMaker.xcodeproj \
+            -scheme AerialSceneryMaker -sdk iphoneos \
+            -configuration Release CODE_SIGNING_ALLOWED=NO \
+            -derivedDataPath build
+      - name: Package unsigned IPA
+        run: |
+          APP_PATH="ios/build/Build/Products/Release-iphoneos/AerialSceneryMaker.app"
+          mkdir -p Payload
+          cp -R "$APP_PATH" Payload/
+          zip -qr AerialSceneryMaker-unsigned.ipa Payload
+          rm -rf Payload
+      - name: Upload unsigned IPA
+        uses: actions/upload-artifact@v4
+        with:
+          name: AerialSceneryMaker-unsigned-IPA
+          path: AerialSceneryMaker-unsigned.ipa
